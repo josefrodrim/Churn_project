@@ -30,7 +30,12 @@ MAX_DATE = 20170228  # prediction date — exclude any rows after this (avoid le
 MAX_SECS = 86400    # sentinel / corrupt values show as ±9.22e15; cap to max 1 day
 
 
-def _agg_chunk(chunk: pd.DataFrame, max_date: int = MAX_DATE, recent_cutoff: int = RECENT_CUTOFF) -> pd.DataFrame:
+def _agg_chunk(
+    chunk: pd.DataFrame,
+    max_date: int = MAX_DATE,
+    recent_cutoff: int = RECENT_CUTOFF,
+    extra_cutoffs: dict = None,
+) -> pd.DataFrame:
     chunk = chunk[chunk["date"] <= max_date].copy()
     if chunk.empty:
         return pd.DataFrame()
@@ -38,30 +43,46 @@ def _agg_chunk(chunk: pd.DataFrame, max_date: int = MAX_DATE, recent_cutoff: int
     chunk["total_songs"] = chunk[SONG_COLS].sum(axis=1)
     chunk["is_recent"] = (chunk["date"] >= recent_cutoff).astype(int)
     chunk["recent_secs"] = chunk["total_secs"] * chunk["is_recent"]
-    return (
-        chunk.groupby("msno", sort=False)
-        .agg(
-            n_days=("date", "count"),
-            total_secs_sum=("total_secs", "sum"),
-            num_100_sum=("num_100", "sum"),
-            num_unq_sum=("num_unq", "sum"),
-            total_songs_sum=("total_songs", "sum"),
-            max_date=("date", "max"),
-            recent_n_days=("is_recent", "sum"),
-            recent_total_secs_sum=("recent_secs", "sum"),
-        )
-        .reset_index()
+
+    agg_kwargs = dict(
+        n_days=("date", "count"),
+        total_secs_sum=("total_secs", "sum"),
+        num_100_sum=("num_100", "sum"),
+        num_unq_sum=("num_unq", "sum"),
+        total_songs_sum=("total_songs", "sum"),
+        max_date=("date", "max"),
+        recent_n_days=("is_recent", "sum"),
+        recent_total_secs_sum=("recent_secs", "sum"),
     )
+    if extra_cutoffs:
+        for name, cutoff in extra_cutoffs.items():
+            chunk[f"_is_{name}"] = (chunk["date"] >= cutoff).astype(int)
+            chunk[f"_secs_{name}"] = chunk["total_secs"] * chunk[f"_is_{name}"]
+            agg_kwargs[f"{name}_n_days"] = (f"_is_{name}", "sum")
+            agg_kwargs[f"{name}_secs_sum"] = (f"_secs_{name}", "sum")
+
+    return chunk.groupby("msno", sort=False).agg(**agg_kwargs).reset_index()
 
 
-def aggregate_logs_chunked(filepath: Path, max_date: int = MAX_DATE, recent_cutoff: int = RECENT_CUTOFF) -> pd.DataFrame:
-    SUM_COLS = [
+def aggregate_logs_chunked(
+    filepath: Path,
+    max_date: int = MAX_DATE,
+    recent_cutoff: int = RECENT_CUTOFF,
+    extra_cutoffs: dict = None,
+) -> pd.DataFrame:
+    BASE_SUM_COLS = [
         "n_days", "total_secs_sum", "num_100_sum", "num_unq_sum",
         "total_songs_sum", "recent_n_days", "recent_total_secs_sum",
     ]
+    extra_sum_cols = []
+    if extra_cutoffs:
+        for name in extra_cutoffs:
+            extra_sum_cols += [f"{name}_n_days", f"{name}_secs_sum"]
+    SUM_COLS = BASE_SUM_COLS + extra_sum_cols
+
     parts = []
     for i, chunk in enumerate(pd.read_csv(filepath, chunksize=CHUNK_SIZE)):
-        part = _agg_chunk(chunk, max_date, recent_cutoff)
+        part = _agg_chunk(chunk, max_date, recent_cutoff, extra_cutoffs)
         if not part.empty:
             parts.append(part)
         if (i + 1) % 25 == 0:
@@ -75,15 +96,32 @@ def aggregate_logs_chunked(filepath: Path, max_date: int = MAX_DATE, recent_cuto
     return result.reset_index()
 
 
-LOG_AGG_CACHE     = ROOT / "data" / "processed" / "user_logs_agg.parquet"
-LOG_AGG_CACHE_MAR = ROOT / "data" / "processed" / "user_logs_agg_mar.parquet"
+LOG_AGG_CACHE        = ROOT / "data" / "processed" / "user_logs_agg.parquet"
+LOG_AGG_CACHE_MAR    = ROOT / "data" / "processed" / "user_logs_agg_mar.parquet"
+LOG_AGG_CACHE_MAR_V2 = ROOT / "data" / "processed" / "user_logs_agg_mar_v2.parquet"
 
 MAX_DATE_MAR      = 20170331
 RECENT_CUTOFF_MAR = 20170228  # ~30 days before 2017-03-31
 
+# Ventanas adicionales para el cache v2 (7d y 90d)
+EXTRA_CUTOFFS_MAR_V2 = {
+    "r7d":  20170324,  # últimos 7 días antes de Mar 31
+    "r90d": 20170101,  # últimos 90 días antes de Mar 31
+}
 
-def load_log_features(use_cache: bool = True, max_date: int = MAX_DATE, recent_cutoff: int = RECENT_CUTOFF) -> pd.DataFrame:
-    cache_path = LOG_AGG_CACHE_MAR if max_date > MAX_DATE else LOG_AGG_CACHE
+
+def load_log_features(
+    use_cache: bool = True,
+    max_date: int = MAX_DATE,
+    recent_cutoff: int = RECENT_CUTOFF,
+    extra_cutoffs: dict = None,
+) -> pd.DataFrame:
+    if extra_cutoffs:
+        cache_path = LOG_AGG_CACHE_MAR_V2
+    elif max_date > MAX_DATE:
+        cache_path = LOG_AGG_CACHE_MAR
+    else:
+        cache_path = LOG_AGG_CACHE
     if use_cache and cache_path.exists():
         print(f"Cargando caché de user_logs ({cache_path.name})...")
         return pd.read_parquet(cache_path)
@@ -92,13 +130,16 @@ def load_log_features(use_cache: bool = True, max_date: int = MAX_DATE, recent_c
         "n_days", "total_secs_sum", "num_100_sum", "num_unq_sum",
         "total_songs_sum", "recent_n_days", "recent_total_secs_sum",
     ]
+    if extra_cutoffs:
+        for name in extra_cutoffs:
+            SUM_COLS += [f"{name}_n_days", f"{name}_secs_sum"]
 
     print("Agregando user_logs.csv...")
-    agg1 = aggregate_logs_chunked(DATA_RAW / "user_logs.csv", max_date, recent_cutoff)
+    agg1 = aggregate_logs_chunked(DATA_RAW / "user_logs.csv", max_date, recent_cutoff, extra_cutoffs)
     print(f"  → {len(agg1):,} usuarios")
 
     print("Agregando user_logs_v2.csv...")
-    agg2 = aggregate_logs_chunked(DATA_RAW / "user_logs_v2.csv", max_date, recent_cutoff)
+    agg2 = aggregate_logs_chunked(DATA_RAW / "user_logs_v2.csv", max_date, recent_cutoff, extra_cutoffs)
     print(f"  → {len(agg2):,} usuarios")
 
     non_empty = [df for df in [agg1, agg2] if len(df) > 0]
