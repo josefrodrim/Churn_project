@@ -6,14 +6,14 @@ predicción de churn en **abril 2017**). Métrica: **log loss** (menor es mejor)
 ## Historial
 
 | Archivo | Public Score | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `submission_lgbm_tuned.csv` | 0.37856 | LightGBM tuneado (Optuna), entrenado en feb, 30 features base |
 | `submission_combined_v2.csv` | 0.61068 | ❌ Intento de combinar feb+mar con offset incorrecto en `days_since_last` |
 | `submission_v3_fixed.csv` | 0.30398 | Fix del offset: referencia fija `LOG_CUTOFF=Mar31` para `days_since_last` |
 | `submission_v4_expiry.csv` | 0.23528 | +6 features: `days_until_expire`, `is_expired`, `prev_churn` y otros |
 | `submission_v5_full.csv` | 0.29875 | ❌ Calibración isotónica sobreajustó el holdout |
 | `submission_v5_raw.csv` | **0.23504** | v5 sin calibración — 48 features, mejor score actual |
-| `submission_v6_temporal.csv` | — | Split temporal correcto: entrenado en feb+mar por separado |
+| `submission_v6_temporal.csv` | 0.24426 | Split temporal correcto: entrenado en feb+mar por separado — 36 features |
 
 ## Mejor submission
 
