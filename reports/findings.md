@@ -429,4 +429,45 @@
 - [x] Modelado: LightGBM ROC-AUC 0.9853, F1 churn 0.760 ✓
 - [x] Análisis de errores: FN son churners silenciosos (activos hasta el final) ✓
 - [x] Features para test set (train_v2): 970K usuarios × 30 features ✓
-- [ ] Hyperparameter tuning (Optuna — en curso)
+- [x] Hyperparameter tuning (Optuna — 60 trials, best CV AUC 0.98580) ✓
+
+---
+
+## Hallazgos — Hyperparameter Tuning (src/models/tune_07.py)
+
+### Optimización Optuna — LightGBM (60 trials × 3-fold CV)
+
+| Métrica | Baseline | Tuned | Delta |
+|---|---|---|---|
+| CV AUC (3-fold) | — | **0.98580** | — |
+| ROC-AUC test | 0.9853 | **0.9854** | +0.0001 |
+| PR-AUC test | 0.8549 | **0.8561** | +0.0012 |
+| F1 churn test | 0.760 (thr=0.89) | **0.760** (thr=0.90) | +0.000 |
+| Accuracy | 0.970 | **0.971** | +0.001 |
+
+### Mejores hiperparámetros (trial 43)
+
+| Parámetro | Valor |
+|---|---|
+| n_estimators | 705 |
+| learning_rate | 0.0192 |
+| num_leaves | 178 |
+| max_depth | 10 |
+| min_child_samples | 148 |
+| subsample | 0.749 |
+| colsample_bytree | 0.715 |
+| reg_alpha | 0.000180 |
+| reg_lambda | 0.772 |
+
+### Interpretación
+
+- La mejora es **marginal** (+0.0001 AUC) — señal de que el modelo baseline ya estaba bien especificado para este dataset
+- El tuning confirma que el espacio de búsqueda fue apropiado: `num_leaves=178` (árbol más complejo que el default 31), `learning_rate` bajo (0.019), y regularización moderada
+- Modelo final guardado en `models/lgbm_tuned.joblib`
+
+---
+
+## Próximos pasos sugeridos
+
+- [ ] Predicciones sobre test set (`data/processed/features_test.parquet`) con `lgbm_tuned.joblib`
+- [ ] Submission CSV para Kaggle
