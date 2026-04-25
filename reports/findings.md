@@ -307,11 +307,59 @@
 
 ---
 
+## Hallazgos — Modelado (src/models/train_06.py)
+
+### Configuración
+
+- Split: 80% train (794,344) / 20% test (198,587), estratificado
+- CV: 5-fold StratifiedKFold
+- Desbalance: `class_weight='balanced'` (LR), `scale_pos_weight=14.6` (XGBoost), `is_unbalance=True` (LightGBM)
+
+### Resultados CV (5-fold sobre train)
+
+| Modelo | ROC-AUC | ± | PR-AUC | ± |
+|---|---|---|---|---|
+| **LightGBM** | **0.9857** | 0.0002 | **0.8559** | 0.0025 |
+| XGBoost | 0.9856 | 0.0002 | 0.8526 | 0.0026 |
+| Logistic Regression | 0.9650 | 0.0003 | 0.5773 | 0.0035 |
+
+### Evaluación en test set
+
+| Modelo | ROC-AUC | PR-AUC | F1 (umbral óptimo) |
+|---|---|---|---|
+| **LightGBM** | **0.9853** | **0.8549** | **0.760** (thr=0.89) |
+| XGBoost | 0.9850 | 0.8505 | 0.756 (thr=0.90) |
+| Logistic Regression | 0.9638 | 0.5710 | 0.611 (thr=0.88) |
+
+### Classification report — LightGBM (test)
+
+| Clase | Precision | Recall | F1 |
+|---|---|---|---|
+| Renewal | 0.982 | 0.986 | 0.984 |
+| Churn | 0.779 | 0.741 | 0.760 |
+
+### Interpretaciones clave
+
+- LightGBM y XGBoost prácticamente idénticos (diferencia de 0.0003 AUC) — ambos dominan sobre LR
+- La LR tiene PR-AUC muy bajo (0.57 vs 0.85) — no captura bien la clase minoritaria a pesar del balanceo
+- Precision churn = 0.779: de cada 10 usuarios predichos como churners, ~8 realmente churnan
+- Recall churn = 0.741: detectamos el 74% de los churners reales
+- **Modelo guardado:** `models/best_model.joblib` (LightGBM)
+
+### Figuras generadas
+
+- `reports/figures/model_roc_pr.png`
+- `reports/figures/model_shap.png`
+
+---
+
 ## Próximos pasos
 
 - [x] EDA profundo de transacciones ✓
 - [x] EDA demografía de members ✓
 - [x] EDA profundo de user_logs ✓
-- [ ] Feature engineering: crear features por usuario uniendo todas las tablas
-- [ ] Definir estrategia de balanceo de clases
-- [ ] Modelado: baseline → XGBoost/LightGBM → SHAP
+- [x] Feature engineering: 992K usuarios × 30 features ✓
+- [x] Modelado: LightGBM ROC-AUC 0.9853, F1 churn 0.760 ✓
+- [ ] Hyperparameter tuning (Optuna / RandomizedSearchCV)
+- [ ] Análisis de errores: quiénes son los falsos negativos
+- [ ] Preparar features para test set (train_v2 / predicción abril 2017)
