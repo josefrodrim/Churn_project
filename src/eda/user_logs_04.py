@@ -121,7 +121,17 @@ def load_log_features(use_cache: bool = True, max_date: int = MAX_DATE, recent_c
 
 # ── FEATURE ENGINEERING ───────────────────────────────────────────────────────
 
-def build_log_features(df: pd.DataFrame, prediction_date: pd.Timestamp = PREDICTION_DATE) -> pd.DataFrame:
+def build_log_features(
+    df: pd.DataFrame,
+    prediction_date: pd.Timestamp = PREDICTION_DATE,
+    days_since_ref: pd.Timestamp = None,
+) -> pd.DataFrame:
+    """
+    days_since_ref: fecha de referencia para days_since_last.
+    Si es None usa prediction_date. Pásala explícitamente = log_cutoff_date
+    para que training y submission usen el mismo punto de referencia y no haya
+    offset sistemático al predecir en un período posterior al de entrenamiento.
+    """
     df = df.copy()
     df["avg_daily_secs"] = df["total_secs_sum"] / df["n_days"]
     df["avg_daily_completed"] = df["num_100_sum"] / df["n_days"]
@@ -134,7 +144,8 @@ def build_log_features(df: pd.DataFrame, prediction_date: pd.Timestamp = PREDICT
     df["last_date"] = pd.to_datetime(
         df["max_date"].astype(str), format="%Y%m%d", errors="coerce"
     )
-    df["days_since_last"] = (prediction_date - df["last_date"]).dt.days
+    ref = days_since_ref if days_since_ref is not None else prediction_date
+    df["days_since_last"] = (ref - df["last_date"]).dt.days
 
     overall_daily = df["total_secs_sum"] / df["n_days"].clip(lower=1)
     recent_daily = df["recent_total_secs_sum"] / df["recent_n_days"].clip(lower=1)
