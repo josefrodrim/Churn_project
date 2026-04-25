@@ -469,5 +469,42 @@
 
 ## Próximos pasos sugeridos
 
-- [ ] Predicciones sobre test set (`data/processed/features_test.parquet`) con `lgbm_tuned.joblib`
-- [ ] Submission CSV para Kaggle
+- [x] Predicciones sobre test set con `lgbm_tuned.joblib` ✓
+- [x] Submission CSV para Kaggle ✓
+
+---
+
+## Resultados Kaggle — Historial de Submissions
+
+**Competencia:** WSDM - KKBox's Churn Prediction Challenge | Métrica: Log Loss (menor es mejor)
+
+| # | Archivo | Entrenamiento | Features | Public Score | Private Score | Nota |
+|---|---|---|---|---|---|---|
+| v1 | `submission_lgbm_tuned.csv` | train.csv (feb) | 30 base | 0.37856 | 0.37486 | Primera submission |
+| v2 | `submission_combined_v2.csv` | train + train_v2 | 30 base | 0.61068 | 0.61133 | ❌ leakage en days_since_last |
+| **v3** | `submission_v3_fixed.csv` | train_v2 (mar) | 30 base + fix ref | **0.30398** | 0.30491 | Fix offset días |
+| **v4** | `submission_v4_expiry.csv` | train_v2 (mar) | 36 (+expiry+lag) | **0.23528** | 0.23570 | Mejor modelo base |
+| v5 cal | `submission_v5_full.csv` | train_v2 (mar) | 48 + calibración | 0.29875 | 0.29595 | ❌ calibración sobreajustó |
+| **v5 raw** | `submission_v5_raw.csv` | train_v2 (mar) | 48 features | **0.23504** | 0.23540 | Mejor score final |
+
+**Mejor submission:** `submission_v5_raw.csv` — Public 0.23504 / Private 0.23540
+
+### Features más importantes (v5)
+1. `days_until_expire` — días hasta vencimiento de membresía (14,848)
+2. `days_since_last_tx` — días desde última transacción (12,739)
+3. `avg_price` — precio promedio del plan (5,505)
+4. `tenure_days` — antigüedad del usuario (5,415)
+5. `n_days_90d` — días activos en últimos 90 días (4,542)
+
+### Lecciones aprendidas
+
+- **Feature más impactante:** `days_until_expire` — la fecha de vencimiento es la señal más directa de churn
+- **Leakage de fechas:** usar reference dates distintas para training y submission infla predicciones sistemáticamente
+- **Calibración:** isotónica sobreajusta con holdout pequeño cuando el churn rate es bajo (~6-9%)
+- **Techo del single-model LightGBM:** ~0.235 log loss. Para bajar al top (0.079) se necesita ensemble + features de secuencia
+
+### Evolución del score
+```
+v1: 0.379  →  v3: 0.304 (−0.075, fix ref)  →  v4: 0.235 (−0.069, expiry features)
+```
+Mejora total: **−38%** sobre la primera submission.
