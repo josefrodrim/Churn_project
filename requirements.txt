@@ -8,3 +8,4 @@ imbalanced-learn
 xgboost
 lightgbm
 shap
+pyarrow
