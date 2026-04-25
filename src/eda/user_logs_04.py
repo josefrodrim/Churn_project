@@ -30,13 +30,13 @@ MAX_DATE = 20170228  # prediction date — exclude any rows after this (avoid le
 MAX_SECS = 86400    # sentinel / corrupt values show as ±9.22e15; cap to max 1 day
 
 
-def _agg_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
-    chunk = chunk[chunk["date"] <= MAX_DATE].copy()
+def _agg_chunk(chunk: pd.DataFrame, max_date: int = MAX_DATE, recent_cutoff: int = RECENT_CUTOFF) -> pd.DataFrame:
+    chunk = chunk[chunk["date"] <= max_date].copy()
     if chunk.empty:
         return pd.DataFrame()
     chunk["total_secs"] = chunk["total_secs"].clip(lower=0, upper=MAX_SECS)
     chunk["total_songs"] = chunk[SONG_COLS].sum(axis=1)
-    chunk["is_recent"] = (chunk["date"] >= RECENT_CUTOFF).astype(int)
+    chunk["is_recent"] = (chunk["date"] >= recent_cutoff).astype(int)
     chunk["recent_secs"] = chunk["total_secs"] * chunk["is_recent"]
     return (
         chunk.groupby("msno", sort=False)
@@ -54,14 +54,14 @@ def _agg_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def aggregate_logs_chunked(filepath: Path) -> pd.DataFrame:
+def aggregate_logs_chunked(filepath: Path, max_date: int = MAX_DATE, recent_cutoff: int = RECENT_CUTOFF) -> pd.DataFrame:
     SUM_COLS = [
         "n_days", "total_secs_sum", "num_100_sum", "num_unq_sum",
         "total_songs_sum", "recent_n_days", "recent_total_secs_sum",
     ]
     parts = []
     for i, chunk in enumerate(pd.read_csv(filepath, chunksize=CHUNK_SIZE)):
-        part = _agg_chunk(chunk)
+        part = _agg_chunk(chunk, max_date, recent_cutoff)
         if not part.empty:
             parts.append(part)
         if (i + 1) % 25 == 0:
@@ -75,26 +75,32 @@ def aggregate_logs_chunked(filepath: Path) -> pd.DataFrame:
     return result.reset_index()
 
 
-LOG_AGG_CACHE = ROOT / "data" / "processed" / "user_logs_agg.parquet"
+LOG_AGG_CACHE     = ROOT / "data" / "processed" / "user_logs_agg.parquet"
+LOG_AGG_CACHE_MAR = ROOT / "data" / "processed" / "user_logs_agg_mar.parquet"
+
+MAX_DATE_MAR      = 20170331
+RECENT_CUTOFF_MAR = 20170228  # ~30 days before 2017-03-31
 
 
-def load_log_features(use_cache: bool = True) -> pd.DataFrame:
-    if use_cache and LOG_AGG_CACHE.exists():
-        print(f"Cargando caché de user_logs ({LOG_AGG_CACHE.name})...")
-        return pd.read_parquet(LOG_AGG_CACHE)
-
-    print("Agregando user_logs.csv...")
-    agg1 = aggregate_logs_chunked(DATA_RAW / "user_logs.csv")
-    print(f"  → {len(agg1):,} usuarios")
-
-    print("Agregando user_logs_v2.csv...")
-    agg2 = aggregate_logs_chunked(DATA_RAW / "user_logs_v2.csv")
-    print(f"  → {len(agg2):,} usuarios")
+def load_log_features(use_cache: bool = True, max_date: int = MAX_DATE, recent_cutoff: int = RECENT_CUTOFF) -> pd.DataFrame:
+    cache_path = LOG_AGG_CACHE_MAR if max_date > MAX_DATE else LOG_AGG_CACHE
+    if use_cache and cache_path.exists():
+        print(f"Cargando caché de user_logs ({cache_path.name})...")
+        return pd.read_parquet(cache_path)
 
     SUM_COLS = [
         "n_days", "total_secs_sum", "num_100_sum", "num_unq_sum",
         "total_songs_sum", "recent_n_days", "recent_total_secs_sum",
     ]
+
+    print("Agregando user_logs.csv...")
+    agg1 = aggregate_logs_chunked(DATA_RAW / "user_logs.csv", max_date, recent_cutoff)
+    print(f"  → {len(agg1):,} usuarios")
+
+    print("Agregando user_logs_v2.csv...")
+    agg2 = aggregate_logs_chunked(DATA_RAW / "user_logs_v2.csv", max_date, recent_cutoff)
+    print(f"  → {len(agg2):,} usuarios")
+
     non_empty = [df for df in [agg1, agg2] if len(df) > 0]
     if len(non_empty) == 1:
         print(f"  → user_logs_v2 sin datos válidos (post-cutoff), usando solo user_logs")
@@ -108,14 +114,14 @@ def load_log_features(use_cache: bool = True) -> pd.DataFrame:
         print(f"  → {len(result):,} usuarios únicos en total")
 
     (ROOT / "data" / "processed").mkdir(parents=True, exist_ok=True)
-    result.to_parquet(LOG_AGG_CACHE, index=False)
-    print(f"  Caché guardado en {LOG_AGG_CACHE.name}")
+    result.to_parquet(cache_path, index=False)
+    print(f"  Caché guardado en {cache_path.name}")
     return result
 
 
 # ── FEATURE ENGINEERING ───────────────────────────────────────────────────────
 
-def build_log_features(df: pd.DataFrame) -> pd.DataFrame:
+def build_log_features(df: pd.DataFrame, prediction_date: pd.Timestamp = PREDICTION_DATE) -> pd.DataFrame:
     df = df.copy()
     df["avg_daily_secs"] = df["total_secs_sum"] / df["n_days"]
     df["avg_daily_completed"] = df["num_100_sum"] / df["n_days"]
@@ -128,7 +134,7 @@ def build_log_features(df: pd.DataFrame) -> pd.DataFrame:
     df["last_date"] = pd.to_datetime(
         df["max_date"].astype(str), format="%Y%m%d", errors="coerce"
     )
-    df["days_since_last"] = (PREDICTION_DATE - df["last_date"]).dt.days
+    df["days_since_last"] = (prediction_date - df["last_date"]).dt.days
 
     overall_daily = df["total_secs_sum"] / df["n_days"].clip(lower=1)
     recent_daily = df["recent_total_secs_sum"] / df["recent_n_days"].clip(lower=1)
