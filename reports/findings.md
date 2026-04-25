@@ -353,6 +353,45 @@
 
 ---
 
+## Hallazgos — Análisis de Errores (src/models/error_analysis_08.py)
+
+### Matriz de confusión — LightGBM (test set, umbral=0.891)
+
+| | Predicho: Renewal | Predicho: Churn |
+|---|---|---|
+| **Real: Renewal** | TN = 183,227 | FP = 2,666 |
+| **Real: Churn** | FN = 3,282 | TP = 9,412 |
+
+### Perfil de Falsos Negativos (FN = 3,282 churners no detectados)
+
+| Feature | FN | TP (detectados) | Diferencia |
+|---|---|---|---|
+| last_is_cancel | 0.126 | 0.472 | FN casi no cancelaron |
+| last_is_auto_renew | 0.214 | 0.485 | FN tienen menos auto-renew activo |
+| days_since_last | 5.0 | 46.9 | **FN estuvieron activos recién** |
+| n_transactions | 12.2 | 11.1 | Similar |
+
+**Conclusión FN:** Son churners "silenciosos" — estuvieron activos en los logs hasta el final (days_since_last=5) pero aun así no renovaron. El modelo no los detecta porque su señal de comportamiento es ambigua: ni cancelo, ni tiene auto-renew claro, ni está inactivo.
+
+### Perfil de Falsos Positivos (FP = 2,666 renewals mal clasificados)
+
+| Feature | FP | Interpretación |
+|---|---|---|
+| proba_churn media | 0.940 | Muy alta confianza en la predicción errónea |
+| last_is_cancel | 0.458 | Cancelaron su última tx (como churners reales) |
+| last_is_auto_renew | 0.466 | Sin auto-renew activo |
+| days_since_last | 26.1 | Inactivos por un mes |
+
+**Conclusión FP:** Son renewals que se comportan idénticamente a churners (cancelaron, sin auto-renew, inactivos) pero al final renovaron. Difíciles de separar sin información adicional (e.g., historial de reactivaciones).
+
+### Figuras generadas
+
+- `reports/figures/error_confusion_matrix.png`
+- `reports/figures/error_distributions.png`
+- `reports/figures/error_scores.png`
+
+---
+
 ## Próximos pasos
 
 - [x] EDA profundo de transacciones ✓
@@ -360,6 +399,34 @@
 - [x] EDA profundo de user_logs ✓
 - [x] Feature engineering: 992K usuarios × 30 features ✓
 - [x] Modelado: LightGBM ROC-AUC 0.9853, F1 churn 0.760 ✓
-- [ ] Hyperparameter tuning (Optuna / RandomizedSearchCV)
-- [ ] Análisis de errores: quiénes son los falsos negativos
-- [ ] Preparar features para test set (train_v2 / predicción abril 2017)
+- [x] Análisis de errores: FN son churners silenciosos (activos hasta el final) ✓
+---
+
+## Hallazgos — Test Set Features (src/features/build_test_features_09.py)
+
+### Dataset: train_v2.csv (predicción marzo 2017)
+
+| Métrica | Valor |
+|---|---|
+| Usuarios | 970,960 |
+| Churn rate | **8.99%** (vs 6.39% en train) |
+| Fecha referencia members/tenure | 2017-03-31 |
+| Caché user_logs reutilizado | ✓ |
+| Nulos tras imputación | 0 |
+| Guardado en | `data/processed/features_test.parquet` |
+
+- El churn rate sube de 6.4% a 9% — marzo 2017 tiene más churners que febrero
+- Mismos 30 features que el train set, con `tenure_days` calculado a 2017-03-31
+
+---
+
+## Próximos pasos
+
+- [x] EDA profundo de transacciones ✓
+- [x] EDA demografía de members ✓
+- [x] EDA profundo de user_logs ✓
+- [x] Feature engineering: 992K usuarios × 30 features ✓
+- [x] Modelado: LightGBM ROC-AUC 0.9853, F1 churn 0.760 ✓
+- [x] Análisis de errores: FN son churners silenciosos (activos hasta el final) ✓
+- [x] Features para test set (train_v2): 970K usuarios × 30 features ✓
+- [ ] Hyperparameter tuning (Optuna — en curso)
