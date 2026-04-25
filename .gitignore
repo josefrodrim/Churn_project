@@ -14,6 +14,7 @@ data/raw/*
 data/processed/*
 data/external/*
 !data/raw/*.dvc
+!data/raw/README.md
 !data/processed/*.dvc
 !data/external/*.dvc
 
