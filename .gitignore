@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data — los archivos reales los maneja DVC, pero los punteros .dvc entran a Git
+data/raw/*
+data/processed/*
+data/external/*
+!data/raw/*.dvc
+!data/processed/*.dvc
+!data/external/*.dvc
+
+# Modelos entrenados — manejado por DVC
+models/*
+!models/*.dvc
+
+# Reportes generados
+reports/figures/
+
+# macOS
+.DS_Store

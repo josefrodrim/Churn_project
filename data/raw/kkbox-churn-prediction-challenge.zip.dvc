@@ -1,0 +1,5 @@
+outs:
+- md5: 4e3f3684a6fba3ce8b517dfe93198fb4
+  size: 8953290156
+  hash: md5
+  path: kkbox-churn-prediction-challenge.zip
