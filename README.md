@@ -82,7 +82,7 @@ reports/
 | 1 — MLflow | ✅ | Tracking de experimentos + model registry |
 | 2 — Feature Store | ✅ | Pipeline batch de features + validación |
 | 3 — FastAPI | ✅ | API de predicción (individual + batch) |
-| 4 — Docker | ⬜ | Dockerfiles + docker-compose.yml |
+| 4 — Docker | ✅ | Dockerfiles + docker-compose.yml |
 | 5 — Tests | ⬜ | Unit, integration, quality gate |
 | 6 — Jenkins | ⬜ | CI, CD, retrain mensual, monitoring diario |
 | 7 — Monitoreo | ⬜ | Evidently + Grafana + alertas automáticas |
@@ -180,7 +180,7 @@ reports/
 | 1 — MLflow | ✅ | Experiment tracking + model registry |
 | 2 — Feature Store | ⬜ | Batch feature pipeline + validation |
 | 3 — FastAPI | ⬜ | Prediction API (single + batch) |
-| 4 — Docker | ⬜ | Dockerfiles + docker-compose.yml |
+| 4 — Docker | ✅ | Dockerfiles + docker-compose.yml |
 | 5 — Tests | ⬜ | Unit, integration, quality gate |
 | 6 — Jenkins | ⬜ | CI, CD, monthly retrain, daily monitoring |
 | 7 — Monitoring | ⬜ | Evidently + Grafana + automatic alerts |
