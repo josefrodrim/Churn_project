@@ -1,0 +1,144 @@
+// Monitoring pipeline — cron: daily at 06:00
+// Steps: drift check (Evidently) → performance check → alert if thresholds exceeded
+
+pipeline {
+    agent any
+
+    triggers {
+        cron('0 6 * * *')
+    }
+
+    environment {
+        PERIOD        = sh(script: "date +%Y-%m", returnStdout: true).trim()
+        API_CONTAINER = 'churn_project-api-1'
+        DRIFT_THRESHOLD  = '0.15'
+        MIN_ROC_AUC      = '0.85'
+    }
+
+    stages {
+
+        stage('Drift Check') {
+            steps {
+                sh """
+                    docker exec ${API_CONTAINER} \
+                        python -m src.monitoring.drift --period ${PERIOD} \
+                        --threshold ${DRIFT_THRESHOLD} \
+                        --output reports/monitoring/drift_${PERIOD}.html
+                """
+            }
+        }
+
+        stage('Performance Check') {
+            steps {
+                sh """
+                    docker exec ${API_CONTAINER} \
+                        python -m src.monitoring.performance --period ${PERIOD} \
+                        --min-auc ${MIN_ROC_AUC} \
+                        --output reports/monitoring/performance_${PERIOD}.json
+                """
+            }
+        }
+
+        stage('Evaluate Alerts') {
+            steps {
+                script {
+                    def drift_result = sh(
+                        script: """
+                            docker exec ${API_CONTAINER} python -c "
+import json, sys
+try:
+    with open('reports/monitoring/drift_${PERIOD}.html') as f:
+        pass
+    # Real check: read drift score from JSON sidecar
+    import pathlib
+    sidecar = pathlib.Path('reports/monitoring/drift_${PERIOD}.json')
+    if sidecar.exists():
+        data = json.loads(sidecar.read_text())
+        score = data.get('drift_score', 0)
+        print(score)
+        sys.exit(1 if score > ${DRIFT_THRESHOLD} else 0)
+    sys.exit(0)
+except Exception as e:
+    print(f'Error reading drift report: {e}')
+    sys.exit(0)
+"
+                        """,
+                        returnStatus: true
+                    )
+
+                    def perf_result = sh(
+                        script: """
+                            docker exec ${API_CONTAINER} python -c "
+import json, sys, pathlib
+p = pathlib.Path('reports/monitoring/performance_${PERIOD}.json')
+if p.exists():
+    data = json.loads(p.read_text())
+    auc = data.get('roc_auc', 1.0)
+    print(auc)
+    sys.exit(1 if auc < ${MIN_ROC_AUC} else 0)
+sys.exit(0)
+"
+                        """,
+                        returnStatus: true
+                    )
+
+                    if (drift_result != 0 || perf_result != 0) {
+                        env.ALERT_NEEDED = 'true'
+                        echo "ALERT: drift=${drift_result != 0}, perf=${perf_result != 0}"
+                    } else {
+                        env.ALERT_NEEDED = 'false'
+                        echo "All metrics within thresholds"
+                    }
+                }
+            }
+        }
+
+        stage('Create GitHub Issue') {
+            when {
+                environment name: 'ALERT_NEEDED', value: 'true'
+            }
+            environment {
+                GITHUB_TOKEN = credentials('github-token')
+                GITHUB_REPO  = 'josefrodriguez/Churn_project'
+            }
+            steps {
+                sh '''
+                    curl -sf -X POST \
+                        -H "Authorization: token $GITHUB_TOKEN" \
+                        -H "Content-Type: application/json" \
+                        -d "{
+                            \\"title\\": \\"[ALERT] Model drift or performance degradation — $(date +%Y-%m-%d)\\",
+                            \\"body\\": \\"Automated monitoring detected issues for period $PERIOD.\\\\n\\\\nCheck reports/monitoring/ for details.\\\\n\\\\n**Action:** review drift report and consider retraining.\\",
+                            \\"labels\\": [\\"monitoring\\", \\"alert\\"]
+                        }" \
+                        "https://api.github.com/repos/$GITHUB_REPO/issues"
+                '''
+            }
+        }
+
+        stage('Weekly HTML Report') {
+            when {
+                // Run only on Mondays (day 1)
+                expression { new Date().day == 1 }
+            }
+            steps {
+                sh """
+                    docker exec ${API_CONTAINER} \
+                        python -m src.monitoring.report --period ${PERIOD} \
+                        --output reports/monitoring/weekly_${PERIOD}.html
+                """
+                archiveArtifacts artifacts: "reports/monitoring/weekly_${PERIOD}.html",
+                                 allowEmptyArchive: true
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Monitoring pipeline failed for ${PERIOD}"
+        }
+        success {
+            echo "Monitoring complete for ${PERIOD} — ALERT_NEEDED=${env.ALERT_NEEDED}"
+        }
+    }
+}

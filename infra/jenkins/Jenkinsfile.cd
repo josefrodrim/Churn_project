@@ -1,0 +1,66 @@
+// CD pipeline — runs on merge to main
+// Steps: docker compose up --build → smoke test → tag image as stable
+
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Deploy Stack') {
+            steps {
+                sh 'docker compose down --remove-orphans || true'
+                sh 'docker compose up --build -d'
+                // wait for API to be reachable (max 60s)
+                sh '''
+                    for i in $(seq 1 12); do
+                        if curl -sf http://localhost:8000/health > /dev/null; then
+                            echo "API ready"; break
+                        fi
+                        echo "Waiting ($i)..."; sleep 5
+                    done
+                '''
+            }
+        }
+
+        stage('Smoke Test') {
+            environment {
+                API_KEY = credentials('churn-api-key')
+            }
+            steps {
+                sh '''
+                    STATUS=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8000/health)
+                    [ "$STATUS" = "200" ] || (echo "Health check failed: $STATUS"; exit 1)
+
+                    STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+                        -H "X-API-Key: $API_KEY" \
+                        -H "Content-Type: application/json" \
+                        -d @infra/jenkins/smoke_payload.json \
+                        http://localhost:8000/predict)
+                    [ "$STATUS" = "200" ] || (echo "Predict smoke test failed: $STATUS"; exit 1)
+
+                    echo "Smoke tests passed"
+                '''
+            }
+        }
+
+        stage('Tag Stable') {
+            steps {
+                sh '''
+                    COMMIT=$(git rev-parse --short HEAD)
+                    docker tag churn-api:latest churn-api:stable-${COMMIT}
+                    echo "Tagged churn-api:stable-${COMMIT}"
+                '''
+            }
+        }
+    }
+
+    post {
+        failure {
+            sh 'docker compose logs api --tail=100'
+            echo "CD failed — stack logs above"
+        }
+        success {
+            echo "Deploy successful — churn API running at http://localhost:8000"
+        }
+    }
+}

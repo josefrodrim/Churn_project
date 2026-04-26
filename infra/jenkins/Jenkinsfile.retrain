@@ -1,0 +1,117 @@
+// Retrain pipeline — cron: 1st of each month at 02:00
+// Steps: compute features → train (MLflow) → quality gate → promote to Production
+
+pipeline {
+    agent any
+
+    triggers {
+        cron('0 2 1 * *')
+    }
+
+    environment {
+        PERIOD        = sh(script: "date +%Y-%m", returnStdout: true).trim()
+        MLFLOW_URI    = 'http://mlflow:5000'
+        MODEL_NAME    = 'churn-ensemble'
+        API_CONTAINER = 'churn_project-api-1'
+    }
+
+    stages {
+
+        stage('Compute Features') {
+            steps {
+                sh """
+                    docker exec ${API_CONTAINER} \
+                        python -m src.pipeline.compute_features --period ${PERIOD}
+                """
+            }
+        }
+
+        stage('Train') {
+            steps {
+                sh """
+                    docker exec \
+                        -e MLFLOW_TRACKING_URI=${MLFLOW_URI} \
+                        ${API_CONTAINER} \
+                        python -m src.models.train_mlflow_17
+                """
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                // train_mlflow_17 auto-transitions to Staging if LogLoss <= 0.240
+                // This step verifies the transition happened
+                sh """
+                    docker exec \
+                        -e MLFLOW_TRACKING_URI=${MLFLOW_URI} \
+                        ${API_CONTAINER} \
+                        python -c "
+import mlflow
+client = mlflow.tracking.MlflowClient('${MLFLOW_URI}')
+versions = client.get_latest_versions('${MODEL_NAME}', stages=['Staging'])
+if not versions:
+    raise SystemExit('Quality gate failed — no model reached Staging')
+v = versions[0]
+print(f'Quality gate passed — model version {v.version} in Staging')
+"
+                """
+            }
+        }
+
+        stage('Promote to Production') {
+            steps {
+                sh """
+                    docker exec \
+                        -e MLFLOW_TRACKING_URI=${MLFLOW_URI} \
+                        ${API_CONTAINER} \
+                        python -c "
+import mlflow
+client = mlflow.tracking.MlflowClient('${MLFLOW_URI}')
+staging = client.get_latest_versions('${MODEL_NAME}', stages=['Staging'])
+if not staging:
+    raise SystemExit('Nothing in Staging to promote')
+v = staging[0]
+client.transition_model_version_stage('${MODEL_NAME}', v.version, 'Production',
+                                       archive_existing_versions=True)
+print(f'Promoted version {v.version} to Production')
+"
+                """
+            }
+        }
+
+        stage('Reload API') {
+            steps {
+                // POST to internal reload endpoint (no downtime)
+                sh """
+                    curl -sf -X POST \
+                        -H "X-API-Key: \$(docker exec ${API_CONTAINER} printenv API_KEY)" \
+                        http://localhost:8000/model/reload \
+                        || echo "Reload endpoint not available — restart instead"
+
+                    docker compose restart api
+                """
+            }
+        }
+
+        stage('Batch Predict') {
+            steps {
+                sh """
+                    docker exec \
+                        -e MLFLOW_TRACKING_URI=${MLFLOW_URI} \
+                        ${API_CONTAINER} \
+                        python -m src.pipeline.batch_predict --period ${PERIOD} --stage Production
+                """
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Retrain pipeline failed for period ${PERIOD}"
+            sh 'docker compose logs api --tail=50'
+        }
+        success {
+            echo "Retrain complete — model promoted to Production, batch predictions written for ${PERIOD}"
+        }
+    }
+}

@@ -1,0 +1,25 @@
+{
+  "features": {
+    "msno": "smoke_test_user",
+    "n_transactions": 12.0, "n_cancels": 1.0, "ever_canceled": 1,
+    "avg_discount_pct": 0.05, "avg_plan_days": 30.0, "avg_price": 149.0,
+    "n_unique_plans": 2.0, "n_payment_methods": 1.0,
+    "last_is_cancel": 0, "last_is_auto_renew": 1,
+    "last_plan_days": 30.0, "last_price": 149.0, "last_list_price": 149.0,
+    "price_trend": 0.0, "last_payment_method": 36,
+    "city": 1, "registered_via": 4, "gender_enc": 0,
+    "age": 28.0, "bd_valid": 1, "tenure_days": 365.0, "has_member_record": 1,
+    "n_days": 20.0, "avg_daily_secs": 3600.0, "avg_daily_completed": 10.0,
+    "avg_daily_unq": 8.0, "completion_ratio": 0.75,
+    "days_since_last": 2.0, "listening_trend": 0.1, "has_log_record": 1,
+    "days_until_expire": 15.0, "is_expired": 0,
+    "auto_renew_at_expire": 1, "cancel_at_expire": 0,
+    "n_renewals": 11.0, "prev_churn": 0,
+    "days_since_last_tx": 5.0, "had_tx_last_7d": 1,
+    "had_tx_last_30d": 1, "n_tx_last_30d": 1.0,
+    "cancel_before_expire": 0,
+    "n_days_7d": 5.0, "secs_per_day_7d": 3200.0,
+    "n_days_90d": 60.0, "secs_per_day_90d": 3400.0,
+    "trend_7d": -100.0, "trend_7d_vs_30d": -50.0
+  }
+}

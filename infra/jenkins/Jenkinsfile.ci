@@ -1,0 +1,55 @@
+// CI pipeline — runs on every commit
+// Steps: lint (ruff) → unit + integration tests → docker build (no push)
+
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_TAG = "churn-api:${env.GIT_COMMIT?.take(8) ?: 'local'}"
+    }
+
+    stages {
+
+        stage('Lint') {
+            steps {
+                sh '''
+                    python -m ruff check src/ tests/ \
+                        --select E,W,F,I \
+                        --ignore E501 \
+                        --output-format=github
+                '''
+            }
+        }
+
+        stage('Test') {
+            environment {
+                API_KEY        = 'changeme'
+                POSTGRES_HOST  = 'localhost'
+                MLFLOW_TRACKING_URI = 'http://localhost:5000'
+            }
+            steps {
+                sh 'python -m pytest tests/ -v --tb=short --junitxml=reports/junit.xml'
+            }
+            post {
+                always {
+                    junit 'reports/junit.xml'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh "docker build -f infra/docker/Dockerfile -t ${IMAGE_TAG} ."
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "CI failed on branch ${env.BRANCH_NAME} — commit ${env.GIT_COMMIT}"
+        }
+        success {
+            echo "CI passed — image ${IMAGE_TAG} ready"
+        }
+    }
+}
