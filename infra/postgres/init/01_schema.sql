@@ -75,11 +75,12 @@ CREATE INDEX IF NOT EXISTS idx_predictions_msno    ON predictions (msno);
 CREATE INDEX IF NOT EXISTS idx_predictions_version ON predictions (model_version);
 
 
--- ── MODEL VERSIONS ────────────────────────────────────────────────────────────
+-- ── CHURN MODEL VERSIONS ────────────────────────────────────────────────────
 -- Registro de qué modelo está activo en cada stage.
 -- MLflow es la fuente de verdad; esta tabla es una proyección para consultas rápidas.
+-- (nombre "churn_model_versions" para no colisionar con las tablas internas de MLflow)
 
-CREATE TABLE IF NOT EXISTS model_versions (
+CREATE TABLE IF NOT EXISTS churn_model_versions (
     id             BIGSERIAL PRIMARY KEY,
     name           TEXT        NOT NULL,
     version        TEXT        NOT NULL,

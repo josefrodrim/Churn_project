@@ -17,9 +17,9 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 # Imagen final slim — solo lo necesario para correr el API.
 FROM python:3.11-slim AS runtime
 
-# libpq5: cliente Postgres en runtime (psycopg2 lo necesita)
+# libpq5: psycopg2 | libgomp1: LightGBM (OpenMP)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpq5 \
+        libpq5 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Usuario no-root para seguridad
@@ -31,6 +31,9 @@ COPY --from=builder /root/.local /home/appuser/.local
 
 # Solo el código fuente — sin datos, notebooks ni modelos
 COPY src/ ./src/
+
+# Directorios que los scripts crean al importarse
+RUN mkdir -p /app/submissions /app/models && chown -R appuser /app
 
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONPATH=/app \

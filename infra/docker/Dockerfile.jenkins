@@ -7,9 +7,12 @@ USER root
 # no en Jenkins directamente, así que no necesitamos Python aquí.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         docker.io \
-        docker-compose-plugin \
         curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -SL "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-$(uname -m)" \
+       -o /usr/local/bin/docker-compose \
+    && chmod +x /usr/local/bin/docker-compose \
+    && ln -s /usr/local/bin/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
 
 # Añadir jenkins al grupo docker para acceder al socket sin sudo
 RUN groupadd -f docker && usermod -aG docker jenkins
