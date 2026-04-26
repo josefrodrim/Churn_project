@@ -15,9 +15,14 @@ predicción de churn en **abril 2017**). Métrica: **log loss** (menor es mejor)
 | `submission_v5_raw.csv` | **0.23504** | v5 sin calibración — 48 features, mejor score actual |
 | `submission_v6_temporal.csv` | 0.24426 | Split temporal correcto: entrenado en feb+mar por separado — 36 features |
 
+| `submission_v7_xgb.csv` | 0.27209 | XGBoost solo — tuneado en 25% subsample, underpredicts (mean 0.049) |
+| `submission_v8_catboost.csv` | 0.23963 | CatBoost solo — ordered boosting, cats nativas |
+| `submission_v9_blend_lgbm_xgb.csv` | 0.23945 | Blend LightGBM + XGBoost — XGB arrastra el score |
+| `submission_v10_blend3.csv` | **0.23412** | Blend LightGBM + XGBoost + CatBoost — nuevo mejor |
+
 ## Mejor submission
 
-`submission_v5_raw.csv` — Public 0.23504 / Private 0.23540
+`submission_v10_blend3.csv` — Public 0.23412 / Private 0.23436
 
 ## Lecciones
 
@@ -25,3 +30,6 @@ predicción de churn en **abril 2017**). Métrica: **log loss** (menor es mejor)
 - Los offsets de fecha entre training y submission arruinan la calibración del modelo
 - La calibración isotónica sobreajusta cuando el holdout es aleatorio (no temporal)
 - El split temporal correcto es: entrenar feb → validar mar → predecir abr
+- El blend de 3 modelos (LGBM + XGB + CatBoost) mejora marginalmente sobre el mejor modelo solo
+- XGBoost tuneado en subsample pequeño (25%) subpredice — necesita tuning en dataset completo
+- CatBoost solo no supera a LGBM, pero añade diversidad útil en el blend
