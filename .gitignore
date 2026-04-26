@@ -25,6 +25,12 @@ models/*
 # Reportes generados
 reports/figures/
 
+# Monitoring reports (generados en runtime)
+reports/monitoring/
+
+# CatBoost training info
+catboost_info/
+
 # macOS
 .DS_Store
 CLAUDE.md
