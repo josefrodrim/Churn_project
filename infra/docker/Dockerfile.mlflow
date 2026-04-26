@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 build-essential libpq-dev \
+    && pip install --no-cache-dir mlflow psycopg2-binary \
+    && apt-get purge -y build-essential libpq-dev \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home mlflow
+USER mlflow
+WORKDIR /mlflow
+
+EXPOSE 5000
+
+# El backend-store-uri y artifact-root se pasan por variables de entorno
+# desde docker-compose para no hardcodear credenciales.
+CMD ["sh", "-c", \
+     "mlflow server \
+      --host 0.0.0.0 \
+      --port 5000 \
+      --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} \
+      --default-artifact-root /mlflow/artifacts \
+      --serve-artifacts"]

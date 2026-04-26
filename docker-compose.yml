@@ -1,0 +1,128 @@
+networks:
+  churn-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  jenkins_home:
+  grafana_data:
+
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: churn-postgres
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-churn}
+      POSTGRES_USER:     ${POSTGRES_USER:-churn_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - churn-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-churn_user} -d ${POSTGRES_DB:-churn}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── MLflow ───────────────────────────────────────────────────────────────────
+  mlflow:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mlflow
+    container_name: churn-mlflow
+    environment:
+      MLFLOW_BACKEND_STORE_URI: >-
+        postgresql://${POSTGRES_USER:-churn_user}:${POSTGRES_PASSWORD:-changeme}
+        @postgres:5432/${POSTGRES_DB:-churn}
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    networks:
+      - churn-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── FastAPI ──────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    container_name: churn-api
+    env_file: .env
+    environment:
+      POSTGRES_HOST:        postgres
+      MLFLOW_TRACKING_URI:  http://mlflow:5000
+    volumes:
+      - ./models:/app/models:ro          # fallback joblib
+      - ./data/processed:/app/data/processed:ro  # parquet caches para pipeline
+    ports:
+      - "8000:8000"
+    networks:
+      - churn-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Grafana ──────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: churn-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER:     ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      POSTGRES_USER:              ${POSTGRES_USER:-churn_user}
+      POSTGRES_PASSWORD:          ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB:                ${POSTGRES_DB:-churn}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - churn-net
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # ── Jenkins ──────────────────────────────────────────────────────────────────
+  jenkins:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.jenkins
+    container_name: churn-jenkins
+    privileged: true
+    user: root
+    environment:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock  # acceso al Docker del host
+      - .:/workspace:ro                             # código fuente read-only
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    networks:
+      - churn-net
+    restart: unless-stopped

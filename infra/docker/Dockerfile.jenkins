@@ -1,0 +1,24 @@
+FROM jenkins/jenkins:lts-jdk17
+
+USER root
+
+# Docker CLI — Jenkins lo usa para lanzar docker compose desde los pipelines.
+# Los scripts Python corren dentro del contenedor api (docker compose exec),
+# no en Jenkins directamente, así que no necesitamos Python aquí.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        docker.io \
+        docker-compose-plugin \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Añadir jenkins al grupo docker para acceder al socket sin sudo
+RUN groupadd -f docker && usermod -aG docker jenkins
+
+# Desactivar el wizard de configuración inicial para CI/CD automatizado
+ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+
+# Plugins mínimos para pipelines declarativos
+COPY infra/jenkins/plugins.txt /usr/share/jenkins/ref/plugins.txt
+RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+
+USER jenkins

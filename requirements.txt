@@ -17,4 +17,4 @@ sqlalchemy
 psycopg2-binary
 asyncpg
 fastapi
-"uvicorn[standard]"
+uvicorn[standard]

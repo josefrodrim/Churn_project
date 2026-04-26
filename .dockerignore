@@ -1,0 +1,46 @@
+# Datos crudos y procesados — demasiado grandes para la imagen
+data/
+*.parquet
+*.csv
+
+# Modelos serializados — se montan como volumen o se cargan desde MLflow
+models/
+
+# Entorno virtual local
+.venv/
+venv/
+
+# Notebooks — no necesarios en el contenedor del API
+notebooks/
+*.ipynb
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Control de versiones
+.git/
+.gitignore
+.dvc/
+*.dvc
+
+# Reportes generados
+reports/
+catboost_info/
+
+# Submissions de Kaggle
+submissions/
+
+# Secrets y configuración local
+.env
+*.env.local
+
+# Docs y archivos del proyecto no necesarios en runtime
+README.md
+CLAUDE.md
+LICENSE
+references/
