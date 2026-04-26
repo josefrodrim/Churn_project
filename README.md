@@ -81,7 +81,7 @@ reports/
 | 0 — Contratos | ✅ | Schemas Pydantic, tablas Postgres, secrets management |
 | 1 — MLflow | ✅ | Tracking de experimentos + model registry |
 | 2 — Feature Store | ✅ | Pipeline batch de features + validación |
-| 3 — FastAPI | ⬜ | API de predicción (individual + batch) |
+| 3 — FastAPI | ✅ | API de predicción (individual + batch) |
 | 4 — Docker | ⬜ | Dockerfiles + docker-compose.yml |
 | 5 — Tests | ⬜ | Unit, integration, quality gate |
 | 6 — Jenkins | ⬜ | CI, CD, retrain mensual, monitoring diario |
