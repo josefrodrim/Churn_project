@@ -1,0 +1,143 @@
+{
+  "__inputs": [],
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.4.0"},
+    {"type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0"},
+    {"type": "panel", "id": "timeseries", "name": "Time series", "version": ""},
+    {"type": "panel", "id": "gauge", "name": "Gauge", "version": ""},
+    {"type": "panel", "id": "stat", "name": "Stat", "version": ""}
+  ],
+  "annotations": {"list": []},
+  "description": "KKBox Churn Model — prediction volume, latency, churn rate, drift score",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Prediction Volume (last 24h)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value", "graphMode": "area"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"value": null, "color": "green"}]}}},
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT COUNT(*) as value FROM predictions WHERE predicted_at >= NOW() - INTERVAL '24 hours'",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Churn Rate Predicted (7-day rolling)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "options": {"tooltip": {"mode": "single"}, "legend": {"displayMode": "list"}},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "color": {"mode": "palette-classic"}}},
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT DATE_TRUNC('day', predicted_at) AS time, AVG(churn_label::float) AS churn_rate FROM predictions WHERE predicted_at >= NOW() - INTERVAL '7 days' GROUP BY 1 ORDER BY 1",
+        "format": "time_series"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Average Churn Probability",
+      "type": "gauge",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "minVizValue": 0, "maxVizValue": 1},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "min": 0, "max": 1,
+          "thresholds": {"steps": [
+            {"value": null,  "color": "green"},
+            {"value": 0.3,   "color": "yellow"},
+            {"value": 0.5,   "color": "red"}
+          ]}
+        }
+      },
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT AVG(churn_prob) as value FROM predictions WHERE predicted_at >= NOW() - INTERVAL '24 hours'",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Model Version in Use",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "blue"}}},
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT model_version as value FROM predictions ORDER BY predicted_at DESC LIMIT 1",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Drift Score (latest)",
+      "type": "gauge",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "minVizValue": 0, "maxVizValue": 1},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "min": 0, "max": 1,
+          "thresholds": {"steps": [
+            {"value": null,  "color": "green"},
+            {"value": 0.10,  "color": "yellow"},
+            {"value": 0.15,  "color": "red"}
+          ]}
+        }
+      },
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT drift_score as value FROM drift_reports ORDER BY computed_at DESC LIMIT 1",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Predictions by Source (batch vs API)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "options": {"tooltip": {"mode": "multi"}, "legend": {"displayMode": "list"}},
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}},
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT DATE_TRUNC('hour', predicted_at) AS time, source, COUNT(*) AS predictions FROM predictions WHERE predicted_at >= NOW() - INTERVAL '7 days' GROUP BY 1, 2 ORDER BY 1",
+        "format": "time_series"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "Drift Score History",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+      "options": {"tooltip": {"mode": "single"}},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "min": 0, "max": 1,
+          "thresholds": {"steps": [{"value": null, "color": "green"}, {"value": 0.15, "color": "red"}]},
+          "custom": {"thresholdsStyle": {"mode": "line"}}
+        }
+      },
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "churn-postgres"},
+        "rawSql": "SELECT computed_at AS time, drift_score FROM drift_reports ORDER BY computed_at",
+        "format": "time_series"
+      }]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["churn", "mlops", "monitoring"],
+  "time": {"from": "now-7d", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Churn Model Monitoring",
+  "uid": "churn-monitoring-v1",
+  "version": 1
+}
