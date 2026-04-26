@@ -11,3 +11,5 @@ shap
 pyarrow
 optuna
 catboost
+mlflow
+pydantic-settings
