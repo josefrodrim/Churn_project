@@ -20,7 +20,7 @@ Proyecto end-to-end de predicción de churn para la competencia [WSDM KKBox Chur
 
 ### Stack tecnológico
 
-```
+```text
 Entrenamiento    → LightGBM + XGBoost + CatBoost (blend ensemble)
 Tracking         → MLflow (experimentos + model registry)
 API              → FastAPI
@@ -39,20 +39,20 @@ docker compose up --build     # levanta los 5 servicios
 
 | Servicio | URL |
 | --- | --- |
-| API REST | http://localhost:8000 |
-| MLflow UI | http://localhost:5000 |
-| Jenkins | http://localhost:8080 |
-| Grafana | http://localhost:3000 |
+| API REST | <http://localhost:8000> |
+| MLflow UI | <http://localhost:5000> |
+| Jenkins | <http://localhost:8080> |
+| Grafana | <http://localhost:3000> |
 | PostgreSQL | localhost:5432 |
 
 ### Estructura del proyecto
 
-```
+```text
 src/
   api/          → FastAPI service (schemas, config, routes)
   eda/          → Análisis exploratorio y carga de datos
   features/     → Feature engineering
-  models/       → Scripts de entrenamiento (numbered: 06–16)
+  models/       → Scripts de entrenamiento (numbered: 06–17)
   pipeline/     → Batch feature computation + batch prediction
   monitoring/   → Drift detection, performance tracking, alertas
 infra/
@@ -79,7 +79,7 @@ reports/
 | Fase | Estado | Descripción |
 | --- | --- | --- |
 | 0 — Contratos | ✅ | Schemas Pydantic, tablas Postgres, secrets management |
-| 1 — MLflow | 🔄 | Tracking de experimentos + model registry |
+| 1 — MLflow | ✅ | Tracking de experimentos + model registry |
 | 2 — Feature Store | ⬜ | Pipeline batch de features + validación |
 | 3 — FastAPI | ⬜ | API de predicción (individual + batch) |
 | 4 — Docker | ⬜ | Dockerfiles + docker-compose.yml |
@@ -118,7 +118,7 @@ End-to-end churn prediction project for the [WSDM KKBox Churn Prediction Challen
 
 ### Tech Stack
 
-```
+```text
 Training         → LightGBM + XGBoost + CatBoost (blend ensemble)
 Experiment Track → MLflow (experiments + model registry)
 API              → FastAPI
@@ -137,20 +137,20 @@ docker compose up --build     # starts all 5 services
 
 | Service | URL |
 | --- | --- |
-| REST API | http://localhost:8000 |
-| MLflow UI | http://localhost:5000 |
-| Jenkins | http://localhost:8080 |
-| Grafana | http://localhost:3000 |
+| REST API | <http://localhost:8000> |
+| MLflow UI | <http://localhost:5000> |
+| Jenkins | <http://localhost:8080> |
+| Grafana | <http://localhost:3000> |
 | PostgreSQL | localhost:5432 |
 
 ### Project Structure
 
-```
+```text
 src/
   api/          → FastAPI service (schemas, config, routes)
   eda/          → Exploratory analysis and data loading
   features/     → Feature engineering
-  models/       → Training scripts (numbered: 06–16)
+  models/       → Training scripts (numbered: 06–17)
   pipeline/     → Batch feature computation + batch prediction
   monitoring/   → Drift detection, performance tracking, alerts
 infra/
@@ -177,7 +177,7 @@ reports/
 | Phase | Status | Description |
 | --- | --- | --- |
 | 0 — Contracts | ✅ | Pydantic schemas, Postgres tables, secrets management |
-| 1 — MLflow | 🔄 | Experiment tracking + model registry |
+| 1 — MLflow | ✅ | Experiment tracking + model registry |
 | 2 — Feature Store | ⬜ | Batch feature pipeline + validation |
 | 3 — FastAPI | ⬜ | Prediction API (single + batch) |
 | 4 — Docker | ⬜ | Dockerfiles + docker-compose.yml |
