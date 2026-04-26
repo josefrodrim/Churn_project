@@ -34,3 +34,9 @@ catboost_info/
 # macOS
 .DS_Store
 CLAUDE.md
+
+# Submission CSVs — archivos grandes, no van a git
+submissions/*.csv
+
+# Jupyter notebook outputs opcionales
+# notebooks/*.ipynb
