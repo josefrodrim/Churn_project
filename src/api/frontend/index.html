@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChurnAI · KKBox Prediction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-title">ChurnAI</div>
+        <div class="logo-sub">KKBox · v1.0</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-view="predict" onclick="navigate('predict')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+        Predict
+      </a>
+      <a class="nav-item" data-view="batch" onclick="navigate('batch')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/>
+        </svg>
+        Batch
+      </a>
+      <a class="nav-item" data-view="dashboard" onclick="navigate('dashboard')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+        </svg>
+        Dashboard
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="api-key-wrap">
+        <label class="field-label">API Key</label>
+        <input id="api-key" type="password" class="field-input" placeholder="your-secret-key">
+      </div>
+      <div id="model-badge" class="model-badge">
+        <span class="badge-dot"></span>
+        <span id="model-version-text">Loading...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- ═══════════════ PREDICT VIEW ═══════════════ -->
+    <section class="view active" id="view-predict">
+      <div class="view-header">
+        <div>
+          <h1>Single Prediction</h1>
+          <p class="view-sub">Predict churn probability for one user</p>
+        </div>
+      </div>
+
+      <div class="predict-layout">
+
+        <!-- Form panel -->
+        <div class="form-panel">
+          <div class="preset-bar">
+            <span class="preset-label">Quick preset:</span>
+            <button class="preset-btn active" data-preset="active"   onclick="applyPreset('active')">🟢 Active</button>
+            <button class="preset-btn"         data-preset="expired"  onclick="applyPreset('expired')">🔴 Expired</button>
+            <button class="preset-btn"         data-preset="new_user" onclick="applyPreset('new_user')">🟡 New</button>
+          </div>
+
+          <div class="field-solo">
+            <label class="field-label">User ID (msno)</label>
+            <input id="f-msno" class="field-input" type="text" placeholder="user_abc_123">
+          </div>
+
+          <div id="feature-groups"></div>
+
+          <button id="predict-btn" class="btn-primary btn-lg" onclick="submitPredict()">
+            Predict Churn
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Result panel -->
+        <div class="result-panel" id="result-panel">
+          <div class="result-placeholder" id="result-placeholder">
+            <div class="placeholder-icon">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <p>Select a preset or fill in the features<br>and click <strong>Predict Churn</strong></p>
+          </div>
+
+          <div class="result-card" id="result-card" style="display:none">
+            <div class="gauge-wrap">
+              <div class="gauge" id="gauge">
+                <div class="gauge-inner">
+                  <span class="gauge-pct" id="gauge-pct">0%</span>
+                  <span class="gauge-sub">churn risk</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="churn-badge" id="churn-badge">—</div>
+
+            <div class="result-meta">
+              <div class="meta-row">
+                <span class="meta-label">User</span>
+                <span class="meta-val" id="res-msno">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Probability</span>
+                <span class="meta-val" id="res-prob">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Model</span>
+                <span class="meta-val" id="res-model">—</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Predicted at</span>
+                <span class="meta-val" id="res-time">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ BATCH VIEW ═══════════════ -->
+    <section class="view" id="view-batch" style="display:none">
+      <div class="view-header">
+        <div>
+          <h1>Batch Prediction</h1>
+          <p class="view-sub">Upload a CSV with up to 10,000 users</p>
+        </div>
+        <button class="btn-secondary" onclick="downloadTemplate()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download template
+        </button>
+      </div>
+
+      <div id="dropzone" class="dropzone" onclick="document.getElementById('csv-input').click()"
+           ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFile(event)">
+        <input id="csv-input" type="file" accept=".csv" style="display:none" onchange="fileSelected(event)">
+        <div class="dropzone-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <p class="dropzone-text">Drop CSV file here or <span class="link">click to browse</span></p>
+        <p class="dropzone-hint">msno column + 48 feature columns · max 10,000 rows</p>
+      </div>
+
+      <div id="batch-preview" style="display:none">
+        <div class="batch-info" id="batch-info"></div>
+        <button id="batch-submit-btn" class="btn-primary" onclick="submitBatch()">
+          Run Batch Prediction
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="batch-progress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <p class="progress-text" id="progress-text">Processing...</p>
+      </div>
+
+      <div id="batch-results" style="display:none">
+        <div class="results-header">
+          <h3 id="batch-result-title">Results</h3>
+          <button class="btn-secondary btn-sm" onclick="downloadResults()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export CSV
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="batch-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Churn Probability</th>
+                <th>Label</th>
+                <th>Model</th>
+              </tr>
+            </thead>
+            <tbody id="batch-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ DASHBOARD VIEW ═══════════════ -->
+    <section class="view" id="view-dashboard" style="display:none">
+      <div class="view-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="view-sub">Real-time model monitoring</p>
+        </div>
+        <button class="btn-secondary" onclick="loadDashboard()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-label">Predictions today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="stat-value" id="stat-churn-rate">—</div>
+          <div class="stat-label">Churn rate today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <div class="stat-value" id="stat-avg-prob">—</div>
+          <div class="stat-label">Avg churn probability</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="stat-value stat-small" id="stat-model">—</div>
+          <div class="stat-label">Active model</div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3>Daily Churn Rate</h3>
+            <span class="card-sub">Last 7 days</span>
+          </div>
+          <div class="chart-area" id="daily-chart">
+            <div class="chart-empty">No data yet</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Recent Predictions</h3>
+            <span class="card-sub" id="recent-count">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>User</th><th>Probability</th><th>Label</th><th>Source</th><th>Time</th></tr>
+              </thead>
+              <tbody id="recent-tbody">
+                <tr><td colspan="5" class="table-empty">No predictions yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

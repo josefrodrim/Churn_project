@@ -12,8 +12,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.config import Settings, get_settings
-from src.api.dependencies import get_db, model_manager
+from src.api.dependencies import get_db, model_manager, verify_api_key
 from src.api.schemas import HealthResponse, ModelInfo
+from fastapi import Security
 from src.models.retrain_submit_14 import FEATURE_COLS_V5
 
 log    = logging.getLogger(__name__)
@@ -73,3 +74,23 @@ async def model_info(cfg: Settings = Depends(get_settings)):
         roc_auc_val   = roc_auc_val,
         registered_at = registered,
     )
+
+
+@router.get("/predictions/recent")
+async def predictions_recent(
+    limit: int = 100,
+    db: AsyncSession  = Depends(get_db),
+    _: str            = Depends(verify_api_key),
+):
+    """Últimas N predicciones — usado por el dashboard del frontend."""
+    result = await db.execute(
+        text("""
+            SELECT msno, churn_prob, churn_label, model_version, source, predicted_at
+            FROM predictions
+            ORDER BY predicted_at DESC
+            LIMIT :limit
+        """),
+        {"limit": min(limit, 500)},
+    )
+    rows = result.mappings().all()
+    return {"predictions": [dict(r) for r in rows], "count": len(rows)}

@@ -12,7 +12,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.api.config import get_settings
 from src.api.dependencies import close_db, init_db, model_manager
@@ -82,13 +83,16 @@ def create_app() -> FastAPI:
         allow_headers  = ["*"],
     )
 
+    # Static files & frontend SPA
+    app.mount("/static", StaticFiles(directory="src/api/frontend/static"), name="static")
+
     # Routers
     app.include_router(admin_router)
     app.include_router(predict_router)
 
     @app.get("/", include_in_schema=False)
     async def root():
-        return RedirectResponse(url="/docs")
+        return FileResponse("src/api/frontend/index.html")
 
     return app
 
