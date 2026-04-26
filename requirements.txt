@@ -10,3 +10,4 @@ lightgbm
 shap
 pyarrow
 optuna
+catboost
