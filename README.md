@@ -1,205 +1,232 @@
-# KKBox Churn Prediction — MLOps Pipeline
+# KKBox Churn Prediction — End-to-End MLOps Pipeline
 
-> **ES** | [EN](#english-version)
+> **English** (primary) · [Español](#versión-en-español) (secondary)
+
+A production-grade machine learning system built on the [WSDM KKBox Churn Prediction Challenge](https://www.kaggle.com/c/kkbox-churn-prediction-challenge) dataset. The project goes beyond model training — it implements a complete local MLOps stack with automated retraining, drift monitoring, CI/CD pipelines, and a REST API ready for deployment.
 
 ---
 
-## Versión en Español
+## What This Demonstrates
 
-Proyecto end-to-end de predicción de churn para la competencia [WSDM KKBox Churn Prediction Challenge](https://www.kaggle.com/c/kkbox-churn-prediction-challenge). Incluye exploración de datos, ingeniería de features, entrenamiento de modelos, y un pipeline completo de MLOps para llevarlo a producción local.
-
-### Resultados del modelo
-
-| Submission | Score público (log loss) | Descripción |
-| --- | --- | --- |
-| v1 LightGBM tuneado | 0.37856 | Baseline — 30 features |
-| v3 Fix temporal | 0.30398 | Fix de offset en `days_since_last` |
-| v4 Expiry features | 0.23528 | +6 features de expiración de membresía |
-| v5 raw (mejor single) | **0.23504** | 48 features, sin calibración |
-| v10 Blend 3 modelos | **0.23412** | LightGBM + XGBoost + CatBoost |
-
-### Stack tecnológico
-
-```text
-Entrenamiento    → LightGBM + XGBoost + CatBoost (blend ensemble)
-Tracking         → MLflow (experimentos + model registry)
-API              → FastAPI
-Base de datos    → PostgreSQL
-Contenedores     → Docker + Docker Compose
-CI/CD            → Jenkins (100% local)
-Monitoreo        → Evidently AI + Grafana + Prometheus
-```
-
-### Levantar el stack completo
-
-```bash
-cp .env.example .env          # configurar variables de entorno
-docker compose up --build     # levanta los 5 servicios
-```
-
-| Servicio | URL |
+| Skill Area | Implementation |
 | --- | --- |
-| API REST | <http://localhost:8000> |
-| MLflow UI | <http://localhost:5000> |
-| Jenkins | <http://localhost:8080> |
-| Grafana | <http://localhost:3000> |
-| PostgreSQL | localhost:5432 |
+| **ML Engineering** | LightGBM + XGBoost + CatBoost ensemble · Optuna tuning · temporal validation split |
+| **Feature Engineering** | 48 features across transactions, membership, listening behavior, and expiry signals |
+| **MLOps** | MLflow experiment tracking + model registry · automated quality gates · model promotion |
+| **Software Engineering** | FastAPI service · Pydantic contracts · async SQLAlchemy · 29-test suite (unit + integration) |
+| **Infrastructure** | Docker multi-stage build · Docker Compose (5 services) · PostgreSQL feature store |
+| **CI/CD** | Jenkins pipelines: CI on every commit, CD on merge, monthly retrain, daily monitoring |
+| **Monitoring** | Evidently AI data drift · performance tracking against ground truth · Grafana dashboards |
 
-### Estructura del proyecto
+---
+
+## Model Results
+
+Best public score: **0.23412 log loss** (top ~30% of competition leaderboard at close).
+
+| Submission | Public Score | Private Score | Description |
+| --- | --- | --- | --- |
+| v1 — Tuned LightGBM | 0.37856 | — | Baseline, 30 features, random split (overfit) |
+| v3 — Temporal fix | 0.30398 | — | Fixed `days_since_last` date-offset bug |
+| v4 — Expiry features | 0.23528 | — | +6 membership expiry signals |
+| v5 — Best single model | 0.23504 | 0.23494 | 48 features, honest temporal split |
+| v8 — CatBoost | 0.23986 | 0.23963 | Single CatBoost, 48 features |
+| v9 — LGBM + XGB blend | 0.23975 | 0.23945 | 2-model blend |
+| **v10 — 3-model blend** | **0.23436** | **0.23412** | LightGBM + XGBoost + CatBoost |
+
+Key insight: `days_until_expire` is the strongest single predictor — an expired membership with `cancel_at_expire=1` is almost certain churn.
+
+---
+
+## Architecture
 
 ```text
-src/
-  api/          → FastAPI service (schemas, config, routes)
-  eda/          → Análisis exploratorio y carga de datos
-  features/     → Feature engineering
-  models/       → Scripts de entrenamiento (numbered: 06–17)
-  pipeline/     → Batch feature computation + batch prediction
-  monitoring/   → Drift detection, performance tracking, alertas
-infra/
-  docker/       → Dockerfiles
-  postgres/     → SQL de inicialización del schema
-  jenkins/      → Jenkinsfiles para los 4 pipelines
-  grafana/      → Dashboards y datasources
-data/
-  raw/          → Datos originales (DVC tracked, read-only)
-  processed/    → Features pre-computadas (DVC tracked)
-models/         → Modelos serializados (joblib/cbm)
-submissions/    → CSVs subidos a Kaggle con historial de scores
-tests/
-  unit/         → Tests de feature engineering
-  integration/  → Tests del API
-notebooks/      → Exploración y experimentos
-reports/
-  figures/      → Gráficas generadas
-  monitoring/   → Reportes de drift (Evidently HTML)
+┌─────────────────────────────────────────────────────────┐
+│                     Docker Compose                       │
+│                                                         │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐            │
+│  │ FastAPI  │   │  MLflow  │   │ Jenkins  │            │
+│  │  :8000   │   │  :5000   │   │  :8080   │            │
+│  └────┬─────┘   └────┬─────┘   └────┬─────┘            │
+│       │              │              │                   │
+│  ┌────▼──────────────▼──────────────▼─────┐            │
+│  │              PostgreSQL :5432           │            │
+│  │  features_monthly · predictions ·      │            │
+│  │  model_versions · ground_truth ·       │            │
+│  │  drift_reports                         │            │
+│  └─────────────────────────────────────────┘            │
+│                                                         │
+│  ┌──────────┐                                           │
+│  │ Grafana  │  ← drift score · churn rate · latency    │
+│  │  :3000   │                                           │
+│  └──────────┘                                           │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Fases del pipeline MLOps
+**Prediction flow:**
 
-| Fase | Estado | Descripción |
-| --- | --- | --- |
-| 0 — Contratos | ✅ | Schemas Pydantic, tablas Postgres, secrets management |
-| 1 — MLflow | ✅ | Tracking de experimentos + model registry |
-| 2 — Feature Store | ✅ | Pipeline batch de features + validación |
-| 3 — FastAPI | ✅ | API de predicción (individual + batch) |
-| 4 — Docker | ✅ | Dockerfiles + docker-compose.yml |
-| 5 — Tests | ⬜ | Unit, integration, quality gate |
-| 6 — Jenkins | ⬜ | CI, CD, retrain mensual, monitoring diario |
-| 7 — Monitoreo | ⬜ | Evidently + Grafana + alertas automáticas |
+1. Monthly batch pipeline computes 48 features from raw data → stores in `features_monthly`
+2. FastAPI `/predict` and `/predict/batch` serve real-time predictions (model loaded once at startup)
+3. Jenkins retrain pipeline runs on the 1st of each month: compute → train → quality gate → promote
+4. Daily monitoring pipeline checks data drift and model performance → alerts via GitHub Issues
 
-### Comandos útiles
+---
 
-```bash
-make up          # Levanta todo el stack
-make down        # Baja el stack
-make test        # Corre pytest
-make retrain     # Reentrenamiento completo + registro en MLflow
-make predict     # Batch prediction mensual
-make drift       # Genera reporte de drift con Evidently
-make promote     # Promueve modelo de Staging a Production
-make logs        # Logs del API en tiempo real
+## Tech Stack
+
+```text
+ML Training      LightGBM · XGBoost · CatBoost · scikit-learn · Optuna
+Experiment Track MLflow (tracking server + model registry + artifact store)
+API              FastAPI · Pydantic v2 · async SQLAlchemy · httpx
+Database         PostgreSQL 15
+Containers       Docker (multi-stage) · Docker Compose
+CI/CD            Jenkins (4 pipelines: CI, CD, retrain, monitoring)
+Monitoring       Evidently AI · Grafana 10.4 · psycopg2
+Testing          pytest · pytest-asyncio · 29 tests (unit + integration)
 ```
 
 ---
 
-## English Version
-
-End-to-end churn prediction project for the [WSDM KKBox Churn Prediction Challenge](https://www.kaggle.com/c/kkbox-churn-prediction-challenge). Covers data exploration, feature engineering, model training, and a complete local MLOps pipeline.
-
-### Model Results
-
-| Submission | Public Score (log loss) | Description |
-| --- | --- | --- |
-| v1 Tuned LightGBM | 0.37856 | Baseline — 30 features |
-| v3 Temporal fix | 0.30398 | Fixed `days_since_last` date offset |
-| v4 Expiry features | 0.23528 | +6 membership expiry features |
-| v5 raw (best single) | **0.23504** | 48 features, no calibration |
-| v10 3-model blend | **0.23412** | LightGBM + XGBoost + CatBoost |
-
-### Tech Stack
-
-```text
-Training         → LightGBM + XGBoost + CatBoost (blend ensemble)
-Experiment Track → MLflow (experiments + model registry)
-API              → FastAPI
-Database         → PostgreSQL
-Containers       → Docker + Docker Compose
-CI/CD            → Jenkins (100% local)
-Monitoring       → Evidently AI + Grafana + Prometheus
-```
-
-### Start the Full Stack
+## Quick Start
 
 ```bash
-cp .env.example .env          # set environment variables
-docker compose up --build     # starts all 5 services
+# 1. Clone and configure
+git clone <repo-url> && cd Churn_project
+cp .env.example .env          # edit secrets if needed
+
+# 2. Start all services
+docker compose up --build -d
+
+# 3. Verify
+curl http://localhost:8000/health
 ```
 
-| Service | URL |
-| --- | --- |
-| REST API | <http://localhost:8000> |
-| MLflow UI | <http://localhost:5000> |
-| Jenkins | <http://localhost:8080> |
-| Grafana | <http://localhost:3000> |
-| PostgreSQL | localhost:5432 |
+| Service | URL | Credentials |
+| --- | --- | --- |
+| REST API + Swagger | <http://localhost:8000/docs> | `X-API-Key: changeme` |
+| MLflow UI | <http://localhost:5000> | — |
+| Jenkins | <http://localhost:8080> | admin / admin |
+| Grafana | <http://localhost:3000> | admin / admin |
+| PostgreSQL | localhost:5432 | see `.env` |
 
-### Project Structure
+---
+
+## Makefile Commands
+
+```bash
+make up          # Start full stack (docker compose up --build -d)
+make down        # Stop stack
+make test        # Run pytest inside the API container
+make retrain     # Full retrain cycle: compute features → train → register
+make predict     # Monthly batch prediction for current period
+make drift       # Generate Evidently drift report
+make promote     # Promote Staging model to Production in MLflow
+make logs        # Tail API logs
+make pipeline    # End-to-end: compute-features + retrain + predict
+```
+
+---
+
+## Project Structure
 
 ```text
 src/
-  api/          → FastAPI service (schemas, config, routes)
-  eda/          → Exploratory analysis and data loading
-  features/     → Feature engineering
-  models/       → Training scripts (numbered: 06–17)
-  pipeline/     → Batch feature computation + batch prediction
-  monitoring/   → Drift detection, performance tracking, alerts
+  api/          FastAPI service — schemas, config, routes, dependencies
+  models/       Training scripts (numbered 06–17, each a new experiment)
+  pipeline/     Batch feature computation + batch prediction (CLI)
+  monitoring/   Drift detection, performance tracking, weekly HTML reports
 infra/
-  docker/       → Dockerfiles
-  postgres/     → Schema initialization SQL
-  jenkins/      → Jenkinsfiles for the 4 pipelines
-  grafana/      → Dashboards and datasources
-data/
-  raw/          → Original data (DVC tracked, read-only)
-  processed/    → Pre-computed features (DVC tracked)
-models/         → Serialized models (joblib/cbm)
-submissions/    → Kaggle submission CSVs with score history
+  docker/       Dockerfiles (API multi-stage, MLflow, Jenkins)
+  postgres/     Schema SQL — 5 production tables
+  jenkins/      Jenkinsfile.ci · Jenkinsfile.cd · Jenkinsfile.retrain · Jenkinsfile.monitoring
+  grafana/      Dashboard JSON + provisioning config
 tests/
-  unit/         → Feature engineering tests
-  integration/  → API endpoint tests
-notebooks/      → Exploration and experiments
+  unit/         Feature engineering + Pydantic validation (16 tests)
+  integration/  API endpoints — auth, predict, batch, health (13 tests)
+notebooks/      EDA and model experiments
+submissions/    Kaggle CSV history with scores
 reports/
-  figures/      → Generated plots
-  monitoring/   → Drift reports (Evidently HTML)
+  monitoring/   Evidently HTML drift reports (generated)
 ```
 
-### MLOps Pipeline Phases
+---
+
+## MLOps Phases
 
 | Phase | Status | Description |
 | --- | --- | --- |
-| 0 — Contracts | ✅ | Pydantic schemas, Postgres tables, secrets management |
-| 1 — MLflow | ✅ | Experiment tracking + model registry |
-| 2 — Feature Store | ⬜ | Batch feature pipeline + validation |
-| 3 — FastAPI | ⬜ | Prediction API (single + batch) |
-| 4 — Docker | ✅ | Dockerfiles + docker-compose.yml |
-| 5 — Tests | ⬜ | Unit, integration, quality gate |
-| 6 — Jenkins | ⬜ | CI, CD, monthly retrain, daily monitoring |
-| 7 — Monitoring | ⬜ | Evidently + Grafana + automatic alerts |
+| 0 — Contracts | ✅ | Pydantic schemas · Postgres tables · `.env` secrets management |
+| 1 — MLflow | ✅ | Experiment tracking · `ChurnEnsemble` pyfunc model · quality gate auto-transition |
+| 2 — Feature Store | ✅ | Batch pipeline · 48 feature columns · idempotent writes · dry-run: 970,957 valid rows |
+| 3 — FastAPI | ✅ | `/predict` · `/predict/batch` (10K max) · `/health` · `/model/info` · async DB logging |
+| 4 — Docker | ✅ | Multi-stage build · 5-service Compose · Jenkins with Docker socket mount |
+| 5 — Tests | ✅ | 29 tests passing · MockModelManager · async API client · edge case coverage |
+| 6 — Jenkins | ✅ | CI (lint + test + build) · CD (deploy + smoke) · monthly retrain · daily monitoring |
+| 7 — Monitoring | ✅ | Evidently drift · performance vs ground truth · Grafana dashboard · GitHub Issue alerts |
 
-### Key Lessons Learned
+---
 
-- `days_until_expire` is the strongest churn signal — expired membership = almost certain churn
-- Date offset between training and submission (reference date mismatch) causes severe calibration errors
-- Isotonic calibration overfits badly on small holdout sets with imbalanced classes
-- Proper temporal split: train(Feb) → validate(Mar) → predict(Apr)
-- A 3-model blend (LightGBM + XGBoost + CatBoost) gives marginal improvement over the best single model
-- XGBoost tuned on a small subsample underpredicts — always tune on representative data
+## Key Engineering Decisions
 
-### Data Overview
+**Temporal split over random split** — Training on Feb, validating on Mar, predicting Apr. A random split gave inflated AUC 0.990 (data leakage via date-correlated features). The honest temporal split gives AUC 0.869.
+
+**Feature Store pattern** — The 28 GB user logs file cannot be queried per-request. Features are pre-computed monthly and stored in Postgres. The API reads from `features_monthly`, not from raw files.
+
+**ModelManager singleton with MLflow → joblib fallback** — The API loads the model once at startup. It tries MLflow Registry first; if the server is unavailable it falls back to local `.joblib` files. This allows development without Docker running.
+
+**Jenkins over GitHub Actions** — Everything is local. Jenkins containers share the host Docker socket and can reach Postgres and MLflow directly, which GitHub Actions runners cannot do without tunneling.
+
+---
+
+## Data Overview
 
 | File | Records | Period | Description |
 | --- | --- | --- | --- |
 | `train.csv` | 992,931 | Feb 2017 | Training labels |
 | `train_v2.csv` | 970,960 | Mar 2017 | Validation labels |
 | `sample_submission_v2.csv` | 907,471 | Apr 2017 | Test set (no labels) |
-| `transactions.csv` | 21.5M | Jan 2015 – Feb 2017 | Payment history |
-| `user_logs.csv` | 392M | Jan 2015 – Feb 2017 | Daily listening behavior (~28 GB) |
+| `transactions.csv` | 21.5M | 2015–2017 | Payment and plan history |
+| `user_logs.csv` | 392M rows (~28 GB) | 2015–2017 | Daily listening behavior |
+
+---
+
+---
+
+## Versión en Español
+
+Proyecto end-to-end de predicción de churn sobre el dataset de la competencia [WSDM KKBox Churn Prediction Challenge](https://www.kaggle.com/c/kkbox-churn-prediction-challenge). Implementa un pipeline MLOps completo con reentrenamiento automático, monitoreo de drift, CI/CD y una API REST lista para producción local.
+
+### Resultados
+
+Mejor score público: **0.23412 log loss** · Ensemble de LightGBM + XGBoost + CatBoost.
+
+### Stack
+
+```text
+Entrenamiento    LightGBM · XGBoost · CatBoost · Optuna
+Tracking         MLflow (experimentos + model registry)
+API              FastAPI + PostgreSQL
+Contenedores     Docker + Docker Compose (5 servicios)
+CI/CD            Jenkins — 4 pipelines automatizados
+Monitoreo        Evidently AI + Grafana + alertas automáticas
+Tests            29 tests (unitarios + integración) — pytest
+```
+
+### Levantar el stack
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+# API en http://localhost:8000/docs
+```
+
+### Fases completadas
+
+Todas las fases del pipeline están implementadas y funcionales — ver tabla [MLOps Phases](#mlops-phases) arriba.
+
+### Decisiones técnicas clave
+
+- **Split temporal honesto**: train(Feb) → validate(Mar) → predict(Apr). El split random daba AUC 0.990 inflado por data leakage.
+- **Feature Store**: los 28 GB de logs no se pueden procesar por request. Features pre-computadas mensualmente en Postgres.
+- **Jenkins local**: accede directamente a Docker, Postgres y MLflow del host — GitHub Actions requeriría tunelado.
+- **Quality gate automático**: si LogLoss > 0.240 en validación, el modelo no se promueve a Staging.
