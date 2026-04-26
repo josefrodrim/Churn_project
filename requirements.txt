@@ -15,3 +15,6 @@ mlflow
 pydantic-settings
 sqlalchemy
 psycopg2-binary
+asyncpg
+fastapi
+"uvicorn[standard]"
