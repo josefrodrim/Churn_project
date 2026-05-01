@@ -122,14 +122,38 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchModelBadge();
 });
 
+// ── Sidebar mobile ─────────────────────────────────────────────────────────
+
+function toggleSidebar() {
+  const sidebar  = document.querySelector('.sidebar');
+  const overlay  = document.getElementById('sidebar-overlay');
+  const isOpen   = sidebar.classList.contains('open');
+  if (isOpen) closeSidebar();
+  else {
+    sidebar.classList.add('open');
+    overlay.style.display = 'block';
+  }
+}
+
+function closeSidebar() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').style.display = 'none';
+}
+
 // ── Navigation ─────────────────────────────────────────────────────────────
 
 function navigate(view) {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById(`view-${view}`).style.display = '';
+  const target = document.getElementById(`view-${view}`);
+  target.style.display = '';
+  // Re-trigger animation by cloning the node's animation class
+  target.style.animation = 'none';
+  target.offsetHeight;    // reflow
+  target.style.animation = '';
   document.querySelector(`[data-view="${view}"]`).classList.add('active');
   if (view === 'dashboard') loadDashboard();
+  closeSidebar();
 }
 
 // ── Form builder ───────────────────────────────────────────────────────────
