@@ -111,7 +111,7 @@ let batchResult = null;
 // ── Init ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  const savedKey = localStorage.getItem('churn_api_key') || '';
+  const savedKey = localStorage.getItem('churn_api_key') || 'changeme';
   document.getElementById('api-key').value = savedKey;
   document.getElementById('api-key').addEventListener('change', e => {
     localStorage.setItem('churn_api_key', e.target.value);
