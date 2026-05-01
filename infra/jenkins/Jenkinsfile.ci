@@ -23,7 +23,7 @@ pipeline {
 
         stage('Test') {
             environment {
-                API_KEY        = 'changeme'
+                API_KEY        = credentials('churn-api-key')
                 POSTGRES_HOST  = 'localhost'
                 MLFLOW_TRACKING_URI = 'http://localhost:5000'
             }
