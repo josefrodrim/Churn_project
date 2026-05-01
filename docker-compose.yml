@@ -71,6 +71,7 @@ services:
     volumes:
       - ./models:/app/models:ro          # fallback joblib
       - ./data/processed:/app/data/processed:ro  # parquet caches para pipeline
+      - mlflow_artifacts:/mlflow/artifacts  # artifact store compartido con MLflow
     ports:
       - "8000:8000"
     networks:

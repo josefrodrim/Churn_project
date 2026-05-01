@@ -15,11 +15,13 @@ EXPOSE 5000
 
 # El backend-store-uri y artifact-root se pasan por variables de entorno
 # desde docker-compose para no hardcodear credenciales.
+# MLflow 3.x: --artifacts-destination + --serve-artifacts activa el proxy HTTP
+# y devuelve mlflow-artifacts:// URIs a los clientes (en lugar de paths locales).
 CMD ["sh", "-c", \
      "mlflow server \
       --host 0.0.0.0 \
       --port 5000 \
       --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} \
-      --default-artifact-root /mlflow/artifacts \
+      --artifacts-destination /mlflow/artifacts \
       --serve-artifacts \
-      --allowed-hosts mlflow,mlflow:5000,localhost,127.0.0.1"]
+      --allowed-hosts mlflow,mlflow:5000,localhost,localhost:5001,127.0.0.1,127.0.0.1:5001"]

@@ -29,7 +29,7 @@ router = APIRouter(prefix="/predict", tags=["predict"])
 def _feature_record_to_df(features) -> pd.DataFrame:
     """Convierte un FeatureRecord a DataFrame de una fila con las columnas correctas."""
     row = {k: getattr(features, k) for k in FEATURE_COLS_V5}
-    return pd.DataFrame([row])[FEATURE_COLS_V5]
+    return pd.DataFrame([row])[FEATURE_COLS_V5].astype("float64")
 
 
 def _build_response(
@@ -99,7 +99,7 @@ async def predict_batch(
         {k: getattr(u, k) for k in FEATURE_COLS_V5}
         for u in request.users
     ]
-    df     = pd.DataFrame(rows)[FEATURE_COLS_V5]
+    df     = pd.DataFrame(rows)[FEATURE_COLS_V5].astype("float64")
     probas = model_manager.predict(df)
     now    = datetime.utcnow()
     period = now.strftime("%Y-%m")
