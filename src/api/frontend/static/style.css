@@ -676,6 +676,73 @@ input,select { font-family:inherit; }
 /* ── Fade helpers ────────────────────────────────────────────────────────── */
 @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
 
+/* ── Key Signals section ─────────────────────────────────────────────────── */
+.key-signals-section {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-left:3px solid var(--accent);
+  border-radius:var(--radius-sm);
+  padding:14px;
+  margin-bottom:8px;
+}
+.key-signals-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:12px;
+}
+.ks-title { font-size:.82rem; font-weight:600; color:var(--text); }
+.ks-hint  { font-size:.72rem; color:var(--text-3); }
+
+/* ── Advanced toggle ──────────────────────────────────────────────────────── */
+.advanced-toggle-wrap { margin-bottom:6px; }
+.advanced-toggle {
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  color:var(--text-2);
+  font-size:.82rem;
+  font-weight:500;
+  transition:all 150ms var(--ease);
+}
+.advanced-toggle:hover { border-color:var(--border-h); color:var(--text); }
+.advanced-toggle.open {
+  border-color:var(--border-h);
+  color:var(--text);
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;
+  border-bottom-color:transparent;
+}
+.adv-toggle-left { display:flex; align-items:center; gap:8px; }
+.adv-count {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:20px;
+  height:18px;
+  padding:0 5px;
+  background:rgba(99,102,241,.15);
+  color:var(--accent);
+  border-radius:99px;
+  font-size:.68rem;
+  font-weight:700;
+}
+.adv-chevron { transition:transform 200ms var(--ease); color:var(--text-3); flex-shrink:0; }
+.advanced-toggle.open .adv-chevron { transform:rotate(90deg); }
+.advanced-body {
+  border:1px solid var(--border-h);
+  border-top:none;
+  border-radius:0 0 var(--radius-sm) var(--radius-sm);
+  padding:8px;
+  background:var(--surface);
+}
+.advanced-body .acc-item:last-child { margin-bottom:0; }
+
 /* ── Responsive — tablet (≤900px) ──────────────────────────────────────── */
 @media (max-width:900px) {
   .stats-grid { grid-template-columns:repeat(2,1fr); }

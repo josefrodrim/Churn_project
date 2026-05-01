@@ -102,6 +102,13 @@ const PRESETS = {
   },
 };
 
+// ── Key signals (always visible) ──────────────────────────────────────────
+
+const KEY_SIGNAL_KEYS = [
+  'days_until_expire', 'is_expired', 'cancel_at_expire', 'auto_renew_at_expire',
+  'last_is_cancel', 'prev_churn', 'days_since_last', 'tenure_days',
+];
+
 // ── State ──────────────────────────────────────────────────────────────────
 
 let gaugeProb   = 0;
@@ -160,25 +167,77 @@ function navigate(view) {
 
 function buildForm() {
   const container = document.getElementById('feature-groups');
-  container.innerHTML = FIELD_GROUPS.map((g, i) => `
-    <div class="acc-item ${i === 0 ? 'open' : ''}" id="acc-${g.id}">
-      <button class="acc-header" onclick="toggleAcc('${g.id}')">
-        <span class="acc-icon">
-          <span>${g.icon}</span>
-          <span>${g.label}</span>
+
+  const keyFields = KEY_SIGNAL_KEYS.map(k => {
+    for (const g of FIELD_GROUPS)
+      for (const f of g.fields)
+        if (f.key === k) return f;
+    return null;
+  }).filter(Boolean);
+
+  const advGroups = FIELD_GROUPS
+    .map(g => ({ ...g, fields: g.fields.filter(f => !KEY_SIGNAL_KEYS.includes(f.key)) }))
+    .filter(g => g.fields.length > 0);
+
+  const advCount = advGroups.reduce((s, g) => s + g.fields.length, 0);
+
+  container.innerHTML = `
+    <div class="key-signals-section">
+      <div class="key-signals-header">
+        <span class="ks-title">Key Signals</span>
+        <span class="ks-hint">Most predictive features</span>
+      </div>
+      <div class="field-grid">
+        ${keyFields.map(f => renderField(f)).join('')}
+      </div>
+    </div>
+
+    <div class="advanced-toggle-wrap">
+      <button class="advanced-toggle" id="advanced-toggle" onclick="toggleAdvanced()">
+        <span class="adv-toggle-left">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+          </svg>
+          Advanced Features
+          <span class="adv-count">${advCount}</span>
         </span>
-        <svg class="acc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
+        <svg class="adv-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" stroke-width="2.5">
           <polyline points="9 18 15 12 9 6"/>
         </svg>
       </button>
-      <div class="acc-body">
-        <div class="field-grid">
-          ${g.fields.map(f => renderField(f)).join('')}
-        </div>
+      <div class="advanced-body" id="advanced-body" style="display:none">
+        ${advGroups.map((g, i) => `
+          <div class="acc-item ${i === 0 ? 'open' : ''}" id="acc-${g.id}">
+            <button class="acc-header" onclick="toggleAcc('${g.id}')">
+              <span class="acc-icon">
+                <span>${g.icon}</span>
+                <span>${g.label}</span>
+              </span>
+              <svg class="acc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.5">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+            <div class="acc-body">
+              <div class="field-grid">
+                ${g.fields.map(f => renderField(f)).join('')}
+              </div>
+            </div>
+          </div>
+        `).join('')}
       </div>
     </div>
-  `).join('');
+  `;
+}
+
+function toggleAdvanced() {
+  const body   = document.getElementById('advanced-body');
+  const toggle = document.getElementById('advanced-toggle');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : '';
+  toggle.classList.toggle('open', !isOpen);
 }
 
 function renderField(f) {
