@@ -22,4 +22,4 @@ CMD ["sh", "-c", \
       --backend-store-uri ${MLFLOW_BACKEND_STORE_URI} \
       --default-artifact-root /mlflow/artifacts \
       --serve-artifacts \
-      --allowed-hosts mlflow,localhost,127.0.0.1"]
+      --allowed-hosts mlflow,mlflow:5000,localhost,127.0.0.1"]
